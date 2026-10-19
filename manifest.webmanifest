@@ -1,0 +1,23 @@
+{
+ "name": "1up",
+ "short_name": "1up",
+ "description": "Golf scores, side games and who owes whom.",
+ "start_url": "./",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "portrait",
+ "background_color": "#0d4935",
+ "theme_color": "#0d4935",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  }
+ ]
+}
