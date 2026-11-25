@@ -399,6 +399,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .junk-row > span:first-child { min-width: 60px; color: var(--ink-2); }
 .tog { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--control-border); background: var(--card); font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .tog[aria-pressed="true"] { border-color: currentColor; }
+/* A pressed toggle takes its player's color; listed after .tog so the fill wins. */
+.tog.t0 { background: var(--p0t); color: var(--p0); } .tog.t1 { background: var(--p1t); color: var(--p1); } .tog.t2 { background: var(--p2t); color: var(--p2); }
+.tog.t3 { background: var(--p3t); color: var(--p3); } .tog.t4 { background: var(--p4t); color: var(--p4); } .tog.t5 { background: var(--p5t); color: var(--p5); }
 .outcome { font-size: 14px; color: var(--ink-2); padding: 8px 0 2px; border-top: 1px solid var(--rule); min-height: 34px; }
 .outcome b { font-weight: 700; }
 .nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 8px; }
@@ -503,6 +506,12 @@ input:hover, select:hover, textarea:hover { border-color: var(--ink-3); }
 .pick.tee[aria-pressed="true"] { background: var(--band); color: var(--ink); border-color: var(--ink); }
 .pick:disabled { opacity: .5; cursor: default; }
 /* Setup players: index and tees in, course handicap out. */
+.howto { font-size: 14px; color: var(--ink-2); }
+.howto summary { cursor: pointer; color: var(--link); font-weight: 600; min-height: 32px; display: flex; align-items: center; list-style: none; }
+.howto summary::-webkit-details-marker { display: none; }
+.howto summary::after { content: " ›"; }
+.howto[open] summary::after { content: " ⌄"; }
+.howto p { margin: 4px 0 8px; line-height: 1.45; }
 .rs-row { display: grid; grid-template-columns: minmax(0, 1fr) 92px 80px; gap: 8px; align-items: center; margin-top: 6px; font-size: 14px; }
 .phc { display: flex; flex-direction: column; gap: 4px; }
 .phc-row { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--rule); }
@@ -642,6 +651,30 @@ table.wi-strip tr:last-child td[data-chg] { box-shadow: inset 0 0 0 2px var(--li
 #toast { position: fixed; left: 50%; transform: translateX(-50%); width: max-content; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--bar); color: var(--on-bar); padding: 10px 16px; border-radius: 10px; font-size: 14px; font-weight: 500; max-width: calc(100% - 32px); z-index: 20; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } .spin { animation: none; } }
 @media (min-width: 640px) { .wrap { padding-block: 24px 64px; } .brand { font-size: 28px; } }
+/* Wide screens (an unfolded iPhone Duo, an iPad, a laptop) get two columns. 760px matches WIDE_QUERY in app.js.
+   Until the page redraws after a fold, columns just stack. */
+.cols, .cols > .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (min-width: 760px) {
+  .wrap, .appbar-in, .holebar-in { max-width: 1120px; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .cols.hole { grid-template-columns: minmax(0, 11fr) minmax(0, 10fr); }
+  /* The whole hole fits above the hole bar on an unfolded Duo: tighter rows, tap targets still 44pt or more. */
+  .wrap { padding-top: 12px; }
+  .cols.hole .entry { padding-top: 8px; }
+  .cols.hole .holeno { font-size: 32px; }
+  .cols.hole .entry-head { padding-bottom: 4px; }
+  .cols.hole .prow { padding: 4px 0; }
+  .cols.hole .stepper .pm { width: 46px; height: 46px; }
+  .cols.hole .stepper .val { height: 46px; }
+  .cols.hole .junk { padding: 6px 0 2px; gap: 6px; }
+  .cols.hole .outcome { padding-top: 6px; }
+  /* The hole card stays put while the games beside it scroll; if it's ever taller than the space, it scrolls on its own. */
+  .cols.hole > .col:first-child { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100dvh - 78px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px) - 24px); overflow-y: auto; overscroll-behavior: contain; border-radius: 12px; }
+  table.sc.whole { min-width: 640px; }
+  .tot-card { max-width: 560px; }
+  /* Home: the season stays in view beside a long list of rounds. */
+  .cols.home > .col:last-child { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+}
 </style>
 <header class="appbar">
   <div class="appbar-in">
@@ -784,9 +817,10 @@ const Golf = (() => {
     const skins = scoreSkins(played.map((h) => holes.find((x) => x.h === h)), ids, sk.mode || 'split', sk.leftover || 'lapse');
     const nassau = scoreNassau(round, holes, list, ids, ch, hcp, games.nassau || {});
     const junk = scoreJunk(round, holes, ids, games.junk || {});
+    const snake = scoreSnake(round, played.map((h) => holes.find((x) => x.h === h)), ids, games.snake || {}, list.length);
     const team = scoreTeam(round, holes, list, ids, games.team || {});
-    const money = settle(games, ids, stroke, skins, nassau, junk, team);
-    return { list, played, ids, holes, ch, mh, stroke, skins, nassau, junk, team, money, thru, complete };
+    const money = settle(games, ids, stroke, skins, nassau, junk, team, snake);
+    return { list, played, ids, holes, ch, mh, stroke, skins, nassau, junk, team, snake, money, thru, complete };
   }
 
   // Lowest net wins the skin. A tie for low splits it among the tied, carries it to the next hole, or
@@ -976,6 +1010,35 @@ const Golf = (() => {
     return { dots, D: sum(ids.map((p) => dots[p])), events };
   }
 
+  // Snake: a 3-putt (or worse) takes the snake and every 3-putt doubles it. Whoever holds it at the end
+  // pays its value, split among the others. Players who 3-putt the same hole share it, or (ties: 'last')
+  // the last of them to putt holds it alone. One snake for the round, or (scope: 'nine') a fresh one each nine.
+  // round.snake maps a hole to the players who 3-putted it, in putting order. Values are in units of the
+  // stake: 1 for the first 3-putt, then 2, 4, 8...
+  function scoreSnake(round, played, ids, cfg, holeCount) {
+    if (!on(cfg)) return { segments: [], per: {}, putts: {} };
+    const marks = round.snake || {};
+    const scopeOf = (h) => (cfg.scope === 'nine' && holeCount === 18 ? (h <= 9 ? 'front' : 'back') : 'round');
+    const segs = {};
+    const order = [];
+    const per = {};
+    const putts = {};
+    ids.forEach((p) => { putts[p] = 0; });
+    const segOf = (key) => segs[key] || (order.push(key), segs[key] = { key, holders: [], count: 0, units: 0 });
+    played.forEach((x) => segOf(scopeOf(x.h)));
+    for (const x of played) {
+      const who = [...new Set((marks[String(x.h)] || []).filter((p) => ids.includes(p)))];
+      if (!who.length) continue;
+      const seg = segOf(scopeOf(x.h));
+      seg.count += who.length;
+      seg.units = 2 ** (seg.count - 1);
+      seg.holders = cfg.ties === 'last' ? [who[who.length - 1]] : who.slice();
+      who.forEach((p) => { putts[p] += 1; });
+      per[x.h] = { putters: who, holders: seg.holders.slice(), units: seg.units, seg: seg.key };
+    }
+    return { segments: order.map((k) => segs[k]), per, putts };
+  }
+
   function stakeOf(g) { const v = Number(g && g.stake); return Number.isFinite(v) && v > 0 ? v : 0; }
 
   function betsWon(nassau, ids) {
@@ -988,7 +1051,7 @@ const Golf = (() => {
   }
 
   // Balances per player; they always sum to zero. Positive means the player collects.
-  function settle(games, ids, stroke, skins, nassau, junk, team) {
+  function settle(games, ids, stroke, skins, nassau, junk, team, snake) {
     const N = ids.length;
     const g = games || {};
     const bal = {};
@@ -1038,7 +1101,20 @@ const Golf = (() => {
       }
       add('Cart vs cart', b);
     }
-    const anyStake = ['stroke', 'skins', 'nassau', 'junk', 'team'].some((k) => on(g[k]) && stakeOf(g[k]) && (k !== 'team' || ids.length === 4));
+    if (on(g.snake) && stakeOf(g.snake) && snake) {
+      const s = stakeOf(g.snake);
+      const b = {};
+      ids.forEach((p) => { b[p] = 0; });
+      for (const seg of snake.segments) {
+        const others = ids.filter((p) => !seg.holders.includes(p));
+        if (!seg.holders.length || !others.length) continue;
+        const v = s * seg.units;
+        seg.holders.forEach((p) => { b[p] -= v / seg.holders.length; });
+        others.forEach((p) => { b[p] += v / others.length; });
+      }
+      add('Snake', b);
+    }
+    const anyStake = ['stroke', 'skins', 'nassau', 'junk', 'team', 'snake'].some((k) => on(g[k]) && stakeOf(g[k]) && (k !== 'team' || ids.length === 4));
     return { bal, lines, transfers: transfersOf(bal), anyStake };
   }
 
@@ -1176,6 +1252,7 @@ if (typeof module !== 'undefined') module.exports = Golf;
     nassau: { on: false, stake: 0, press: true, format: 'pairs', teams: null },
     team: { on: false, stake: 0, scoring: 'best', partners: 'fixed', teams: null },
     junk: { on: false, stake: 0, birdies: true, greenies: true, sandies: true, parOrBetter: true },
+    snake: { on: false, stake: 1, scope: 'round', ties: 'split' },
   };
   // Rules added after the first rounds were played. A round saved without them keeps scoring the way it was played.
   function playedRules(g) {
@@ -1192,7 +1269,7 @@ if (typeof module !== 'undefined') module.exports = Golf;
     pending: {}, inflight: {}, busy: {}, timers: {}, retries: {},
     view: 'home', roundId: null, hole: 1, year: null,
     setup: null, settings: null, course: null, courseReturn: null, photo: null, cardCheck: null,
-    confirm: null, formError: '', copyText: '', restored: false,
+    confirm: null, formError: '', copyText: '', restored: false, howto: {},
     sample: null, sampleImages: false, sampleMax: 1,
     report: (() => { try { return localStorage.getItem('sb-report') === 'h2h' ? 'h2h' : 'table'; } catch (e) { return 'table'; } })(),
     h2h: (() => { try { const v = JSON.parse(localStorage.getItem('sb-h2h') || 'null'); return v && v.a && v.b ? v : null; } catch (e) { return null; } })(),
@@ -1395,6 +1472,15 @@ if (typeof module !== 'undefined') module.exports = Golf;
     }
     return null;
   }
+  // ---------- wide screens ----------
+  // An unfolded iPhone Duo, an iPad or a laptop browser is wide enough for two columns; phones keep one.
+  const WIDE_QUERY = '(min-width: 760px)';
+  const isWide = () => !!(window.matchMedia && window.matchMedia(WIDE_QUERY).matches);
+  // Left and right columns on a wide screen; on a phone the same pieces, one after the other.
+  const twoCols = (left, right, cls) => (isWide() ? '<div class="cols' + (cls ? ' ' + cls : '') + '"><div class="col">' + left + '</div><div class="col">' + right + '</div></div>' : left + right);
+  // Two columns only when both sides have something in them.
+  const pairCols = (left, right, cls) => (left && right ? twoCols(left, right, cls) : left + right);
+
   function render() {
     renderTop();
     const v = $('#view');
@@ -1499,6 +1585,18 @@ if (typeof module !== 'undefined') module.exports = Golf;
   // ---------- home ----------
   function homeHTML() {
     const rounds = roundsSorted();
+    const ex = expiryWarning();
+    const top = (ex ? '<div class="expiry" role="status">' + esc(ex) + '</div>' : '') + homeScreenHint();
+    const now = resumeHTML(rounds) + tripNowHTML();
+    let more = S.readOnly ? '<div class="row"><span class="chip">View only</span></div>' : '<button class="btn primary wide" data-action="new">Start a round</button><div class="row"><span></span><button class="btn ghost" data-action="trip-new">Start a trip</button></div>';
+    const trips = tripsSorted();
+    if (trips.length) more += '<section class="stack"><div class="label">Trips</div>' + trips.map(tripRowHTML).join('') + '</section>';
+    more += '<section class="stack"><div class="label">Rounds</div>' + (rounds.length ? rounds.map(roundRowHTML).join('') : '<div class="notice">No rounds yet. Start one on the first tee, or enter a finished card hole by hole.</div>') + '</section>';
+    // Wide: what to do next on the left, the season on the right.
+    return isWide() ? top + twoCols(now + more, seasonHTML(rounds), 'home') : top + now + seasonHTML(rounds) + more;
+  }
+  // Standings or head to head for the season picked, or all time.
+  function seasonHTML(rounds) {
     const roster = conf().roster;
     const years = [...new Set(rounds.map((r) => String(r.date || '').slice(0, 4)).filter((y) => /^\d{4}$/.test(y)))].sort().reverse();
     const thisYear = String(new Date().getFullYear());
@@ -1506,8 +1604,7 @@ if (typeof module !== 'undefined') module.exports = Golf;
     if (!yr || (yr !== 'all' && !years.includes(yr))) yr = years.includes(thisYear) ? thisYear : (years[0] || thisYear);
     const pick = rounds.filter((r) => yr === 'all' || String(r.date || '').startsWith(yr));
     const s = Golf.season(pick);
-    const ex = expiryWarning();
-    let out = (ex ? '<div class="expiry" role="status">' + esc(ex) + '</div>' : '') + homeScreenHint() + resumeHTML(rounds) + tripNowHTML() + '<section class="card stack">';
+    let out = '<section class="card stack">';
     out += '<div class="row"><div><div class="label">' + (yr === 'all' ? 'All time' : 'Season') + '</div><div class="title">' + (yr === 'all' ? 'Every round' : esc(yr)) + '</div></div>';
     if (years.length > 1) out += '<select id="f-year" aria-label="Season" style="width:auto">' + years.map((y) => opt(y, y, yr)).join('') + opt('all', 'All time', yr) + '</select>';
     out += '</div>';
@@ -1543,13 +1640,6 @@ if (typeof module !== 'undefined') module.exports = Golf;
       out += '<div class="muted">' + plural(s.rounds, 'finished round') + (ids.some((id) => s.players[id].ties) ? ' · T is a shared win' : '') + '</div>';
       }
     }
-    out += '</section>';
-    if (!S.readOnly) out += '<button class="btn primary wide" data-action="new">Start a round</button><div class="row"><span></span><button class="btn ghost" data-action="trip-new">Start a trip</button></div>';
-    else out += '<div class="row"><span class="chip">View only</span></div>';
-    const trips = tripsSorted();
-    if (trips.length) out += '<section class="stack"><div class="label">Trips</div>' + trips.map(tripRowHTML).join('') + '</section>';
-    out += '<section class="stack"><div class="label">Rounds</div>';
-    out += rounds.length ? rounds.map(roundRowHTML).join('') : '<div class="notice">No rounds yet. Start one on the first tee, or enter a finished card hole by hole.</div>';
     out += '</section>';
     return out;
   }
@@ -1919,6 +2009,7 @@ if (typeof module !== 'undefined') module.exports = Golf;
     if (g.skins.on) out.push('Skins, ' + skinsRule(g.skins));
     if (g.nassau.on) out.push('Nassau');
     if (g.junk.on) out.push('Junk');
+    if (g.snake && g.snake.on) out.push('Snake');
     if (g.team && g.team.on) out.push(g.team.partners === 'sixes' ? 'Sixes' : 'Cart vs cart');
     return out;
   }
@@ -1929,6 +2020,7 @@ if (typeof module !== 'undefined') module.exports = Golf;
     if (g.skins.on) out.push('Skins, ' + skinsRule(g.skins) + (g.skins.mode === 'carry' && g.skins.leftover === 'split' ? ', leftovers to the tied' : '') + st(g.skins.stake, ' a skin'));
     if (g.nassau.on) out.push('Nassau' + (g.nassau.format === 'teams' ? ', 2 v 2 best ball' : '') + (g.nassau.press ? ', auto press' : '') + st(g.nassau.stake, ' a bet'));
     if (g.junk.on) out.push('Junk' + (g.junk.parOrBetter ? ', par or better' : '') + st(g.junk.stake, ' a dot'));
+    if (g.snake && g.snake.on) out.push('Snake' + (g.snake.stake ? ', starts at ' + money(g.snake.stake) : '') + (g.snake.scope === 'nine' ? ', fresh each nine' : '') + (g.snake.ties === 'last' ? ', last 3-putt holds it' : ''));
     if (g.team && g.team.on) out.push('Cart vs cart, ' + (g.team.scoring === 'both' ? 'both balls' : 'best ball') + (g.team.partners === 'sixes' ? ', partners switch every 6' : '') + st(g.team.stake, ' a match each'));
     return out;
   }
@@ -2273,7 +2365,8 @@ if (typeof module !== 'undefined') module.exports = Golf;
     if (!a.list.includes(S.hole)) S.hole = a.list[0];
     // A finished card is locked: results only, until someone taps Edit scores.
     const live = !S.readOnly && (!a.complete || S.editing === r.id);
-    let out = '<div class="row"><button class="btn ghost" data-action="home">‹ Rounds</button>' + (S.readOnly ? '<span class="chip">View only</span>' : live ? '<button class="btn ghost" data-action="edit-setup">Edit setup</button>' : '<button class="btn" data-action="edit-scores">Edit scores</button>') + '</div>';
+    const nav = '<div class="row"><button class="btn ghost" data-action="home">‹ Rounds</button>' + (S.readOnly ? '<span class="chip">View only</span>' : live ? '<button class="btn ghost" data-action="edit-setup">Edit setup</button>' : '<button class="btn" data-action="edit-scores">Edit scores</button>') + '</div>';
+    let out = '';
     const courseLink = S.courses[r.courseId] ? '<button class="linkish" data-action="course-open" data-id="' + esc(r.courseId) + '">' + esc(r.course.name) + '</button>' : esc(r.course.name);
     const loc = locOf(r);
     const facts = [fmtTime(r.teeTime) ? 'Tee time ' + fmtTime(r.teeTime) : '', durationOf(r)].filter(Boolean).join(' · ');
@@ -2286,18 +2379,17 @@ if (typeof module !== 'undefined') module.exports = Golf;
     const trip = r.tripId && S.trips[r.tripId];
     const tripLink = trip ? '<div class="muted">Part of <button class="linkish" data-action="trip-open" data-id="' + esc(r.tripId) + '">' + esc(trip.name) + '</button></div>' : '';
     if (live) {
-      out += '<section class="live-head"><div class="row" style="align-items:center"><div class="lh-course">' + courseLink + '</div>' + wxChip(r.weather, false) + '</div><div class="muted">' + esc([fmtDate(r.date), loc, shotsLine(r, pp.P)].filter(Boolean).join(' · ')) + '</div>' + tripLink + wxAdd + '</section>';
-      if (a.complete) out += '<div class="final"><span>Every hole is in. Finish to lock the card.</span><button class="btn primary" data-action="finish">Finish round</button></div>';
-      out += entryHTML(r, a, pp);
-      out += tilesHTML(r, a, pp);
+      const head = '<section class="live-head"><div class="row" style="align-items:center"><div class="lh-course">' + courseLink + '</div>' + wxChip(r.weather, false) + '</div><div class="muted">' + esc([fmtDate(r.date), loc, shotsLine(r, pp.P)].filter(Boolean).join(' · ')) + '</div>' + tripLink + wxAdd + '</section>';
+      const fin = a.complete ? '<div class="final"><span>Every hole is in. Finish to lock the card.</span><button class="btn primary" data-action="finish">Finish round</button></div>' : '';
+      // Wide: the hole being entered on the left, from the top of the screen; everything else on the right.
+      out += isWide() ? twoCols(entryHTML(r, a, pp), nav + head + fin + tilesHTML(r, a, pp), 'hole') : nav + head + fin + entryHTML(r, a, pp) + tilesHTML(r, a, pp);
     } else {
-      out += '<section class="stack" style="gap:2px"><div class="row" style="align-items:flex-start"><div class="title">' + esc(fmtDate(r.date, true)) + '</div>' + wxChip(r.weather, true) + '</div><div class="muted">' + courseLink + (loc ? esc(' · ' + loc) : '') + esc(' · ' + shotsLine(r, pp.P)) + '</div>' + (facts ? '<div class="muted">' + esc(facts) + '</div>' : '') + tripLink + wxAdd + '</section>';
-      out += tilesHTML(r, a, pp);
+      out += nav + '<section class="stack" style="gap:2px"><div class="row" style="align-items:flex-start"><div class="title">' + esc(fmtDate(r.date, true)) + '</div>' + wxChip(r.weather, true) + '</div><div class="muted">' + courseLink + (loc ? esc(' · ' + loc) : '') + esc(' · ' + shotsLine(r, pp.P)) + '</div>' + (facts ? '<div class="muted">' + esc(facts) + '</div>' : '') + tripLink + wxAdd + '</section>';
+      out += pairCols(tileGridHTML(r, a, pp), settleHTML(a, pp));
       if (S.readOnly && !a.complete) out += entryHTML(r, a, pp);
     }
     out += cardHTML(r, a, pp, live);
-    out += settingsCardHTML(r, a, pp);
-    if (a.thru) out += whatIfHTML(r, a, pp);
+    out += pairCols(settingsCardHTML(r, a, pp), a.thru ? whatIfHTML(r, a, pp) : '');
     out += '<div class="row"><button class="btn" data-action="copy">' + (S.native ? 'Share results' : 'Copy results') + '</button>' + (!live || S.confirm === 'round' ? '' : '<button class="btn ghost danger" data-action="ask-delete">Delete round</button>') + '</div>';
     if (S.confirm === 'round') out += '<div class="confirm" role="alert"><span>Delete this round for good?</span><span style="flex:1"></span><button class="btn" data-action="cancel-confirm">Keep it</button><button class="btn danger solid" data-action="delete-round">Delete</button></div>';
     if (S.copyText) out += '<textarea class="copybox" id="copybox" readonly aria-label="Results to copy">' + esc(S.copyText) + '</textarea>';
@@ -2329,7 +2421,20 @@ if (typeof module !== 'undefined') module.exports = Golf;
   function tile(label, big, sub, wide) {
     return '<div class="tile' + (wide ? ' wide' : '') + '"><div class="label">' + label + '</div><div class="big">' + big + '</div>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>';
   }
+  // Who holds the snake (each nine's, when it resets at the turn) and what it's worth.
+  function snakeTile(r, a, P) {
+    const segs = a.snake.segments;
+    const label = { round: '', front: 'Front: ', back: 'Back: ' };
+    const one = (sg, html) => (!sg.count ? (html ? '<span class="muted">No 3-putts yet</span>' : 'No 3-putts yet') : (html ? sg.holders.map((id) => nm(P[id])).join(' &amp; ') : andList(sg.holders.map((id) => P[id].name))) + ' ' + (snakeValue(r, sg.units) ? money(snakeValue(r, sg.units)) : 'x' + sg.units));
+    const big = segs.map((sg) => label[sg.key] + one(sg, true)).join('<br>') || 'No 3-putts yet';
+    const counts = a.ids.filter((id) => a.snake.putts[id]).map((id) => P[id].name + ' ' + a.snake.putts[id]);
+    const sub = (counts.length ? '3-putts: ' + counts.join(', ') : 'Everyone two-putting so far') + (a.complete ? '' : ' · holder pays at the end');
+    return [big, esc(sub)];
+  }
   function tilesHTML(r, a, pp) {
+    return tileGridHTML(r, a, pp) + settleHTML(a, pp);
+  }
+  function tileGridHTML(r, a, pp) {
     const g = r.games;
     const P = pp.P;
     const t = [];
@@ -2342,16 +2447,18 @@ if (typeof module !== 'undefined') module.exports = Golf;
       const sub = ev.length ? ev.slice(0, 4).join(', ') + (ev.length > 4 ? ', +' + (ev.length - 4) + ' more' : '') : 'No dots yet';
       t.push(['Junk dots', big, esc(sub)]);
     }
+    if (g.snake && g.snake.on) t.push(['Snake'].concat(snakeTile(r, a, P)));
     const cells = t.map((x, i) => tile(x[0], x[1], x[2], a.ids.length > 2 || (t.length % 2 === 1 && i === t.length - 1)));
     if (g.nassau.on) cells.push(nassauTile(r, a, pp));
     if (g.team.on && a.team.matches.length) cells.push(teamTile(r, a, pp));
-    let out = cells.length ? '<div class="tiles">' + cells.join('') + '</div>' : '';
-    if (a.money.anyStake) {
-      const lines = settleLines(a, P);
-      const bal = pp.list.map((p) => p.name + ' ' + signed(a.money.bal[p.id])).join(' · ');
-      out += '<div class="settle"><div class="label">' + (a.complete ? 'Settle up' : 'Money so far') + '</div>' + lines.map((l) => '<div class="xfer">' + esc(l) + '</div>').join('') + '<div class="sub">' + esc(bal) + '</div></div>';
-    }
-    return out;
+    return cells.length ? '<div class="tiles">' + cells.join('') + '</div>' : '';
+  }
+  // Who pays whom: money so far during a round, the settle-up once it's finished.
+  function settleHTML(a, pp) {
+    if (!a.money.anyStake) return '';
+    const lines = settleLines(a, pp.P);
+    const bal = pp.list.map((p) => p.name + ' ' + signed(a.money.bal[p.id])).join(' · ');
+    return '<div class="settle"><div class="label">' + (a.complete ? 'Settle up' : 'Money so far') + '</div>' + lines.map((l) => '<div class="xfer">' + esc(l) + '</div>').join('') + '<div class="sub">' + esc(bal) + '</div></div>';
   }
   function teamTile(r, a, pp) {
     const P = pp.P;
@@ -2409,6 +2516,15 @@ if (typeof module !== 'undefined') module.exports = Golf;
     const ids = Object.keys(carried).filter((id) => carried[id] > 0 && P[id]).sort((p, q) => carried[q] - carried[p]);
     return ids.length ? '<div class="sub">Carried the cart: ' + ids.map((id) => nm(P[id]) + ' ' + carried[id]).join(' · ') + '</div>' : '';
   }
+  // " Seth takes the snake, now $4." for a hole where someone 3-putted.
+  function snakeLine(r, a, x, P) {
+    const z = a.snake && a.snake.per[x.h];
+    if (!z) return '';
+    const val = snakeValue(r, z.units);
+    const names = andList(z.holders.map((id) => P[id].name));
+    return ' ' + esc(names) + (z.holders.length > 1 ? ' share the snake' : ' takes the snake') + (val ? ', now ' + money(val) : ', now worth ' + z.units) + '.';
+  }
+  const snakeValue = (r, units) => (num(r.games.snake && r.games.snake.stake, 0) * units);
   function outcomeHTML(r, a, x, P) {
     const g = r.games;
     const ids = a.ids;
@@ -2445,6 +2561,7 @@ if (typeof module !== 'undefined') module.exports = Golf;
     if (g.junk.on) {
       a.junk.events.filter((e) => e.h === x.h && (e.kind === 'Birdie' || e.kind === 'Eagle')).forEach((e) => { s += ' ' + e.kind + ' for ' + esc(P[e.p].name) + '.'; });
     }
+    s += snakeLine(r, a, x, P);
     return s;
   }
   function entryHTML(r, a, pp) {
@@ -2486,35 +2603,45 @@ if (typeof module !== 'undefined') module.exports = Golf;
       }
       if (jr) out += '<div class="junk">' + jr + '</div>';
     }
+    if (g.snake && g.snake.on) {
+      const who = (r.snake || {})[k] || [];
+      const last = g.snake.ties === 'last' && who.length > 1 ? who[who.length - 1] : null;
+      out += '<div class="junk"><div class="junk-row"><span>3-putt</span>' + pp.list.map((p) => '<button class="tog' + (who.includes(p.id) ? ' t' + p.color : '') + '" data-action="snake" data-p="' + esc(p.id) + '" aria-pressed="' + who.includes(p.id) + '"' + (S.readOnly ? ' disabled' : '') + '>' + esc(p.name) + (p.id === last ? ' (last)' : '') + '</button>').join('') + '</div>' +
+        (g.snake.ties === 'last' ? '<div class="muted">Tap in putting order. The last one tapped holds the snake.</div>' : '') + '</div>';
+    }
     out += '<div class="outcome" aria-live="polite">' + outcomeHTML(r, a, x, P) + '</div>';
     const anyHere = a.ids.some((id) => x.g[id] != null);
     if (!S.readOnly && anyHere) out += '<div class="nav"><button class="btn ghost" data-action="clear-hole">Clear hole</button></div>';
     out += '</section>';
     return out;
   }
-  function nineTable(r, a, pp, hs, lab, tee, live) {
+  // One scorecard table. Each group is a nine and its total column (Out, In); with whole set, a Tot column follows.
+  function scoreTable(r, a, pp, groups, tee, live, whole) {
     const cur = (h) => (h === S.hole ? ' cur' : '');
-    let t = '<div class="sc-wrap"><table class="sc"><colgroup><col class="lab">' + '<col>'.repeat(10) + '</colgroup>';
-    t += '<tr class="band"><th scope="row">Hole</th>' + hs.map((x) => (live ? '<td class="' + cur(x.h).trim() + '"><button class="hb" data-action="goto" data-h="' + x.h + '" aria-label="Hole ' + x.h + '">' + x.h + '</button></td>' : '<td>' + x.h + '</td>')).join('') + '<td>' + lab + '</td></tr>';
-    if (tee) t += '<tr><th scope="row">Yds</th>' + hs.map((x) => '<td class="small">' + esc(tee.yards[x.h - 1]) + '</td>').join('') + '<td class="tot small">' + sum(hs.map((x) => tee.yards[x.h - 1])) + '</td></tr>';
-    t += '<tr class="par"><th scope="row">Par</th>' + hs.map((x) => '<td>' + x.par + '</td>').join('') + '<td class="tot">' + sum(hs.map((x) => x.par)) + '</td></tr>';
-    t += '<tr><th scope="row">Hcp</th>' + hs.map((x) => '<td class="small">' + x.hcp + '</td>').join('') + '<td class="tot"></td></tr>';
+    const all = groups.flatMap((g) => g.hs);
+    const row = (head, cell, tot) => head + groups.map((g) => g.hs.map(cell).join('') + tot(g.hs, g.lab)).join('') + (whole ? tot(all, 'Tot') : '') + '</tr>';
+    const blank = () => '<td class="tot"></td>';
+    const cols = all.length + groups.length + (whole ? 1 : 0);
+    let t = '<div class="sc-wrap"><table class="sc' + (whole ? ' whole' : '') + '"><colgroup><col class="lab">' + '<col>'.repeat(cols) + '</colgroup>';
+    t += row('<tr class="band"><th scope="row">Hole</th>', (x) => (live ? '<td class="' + cur(x.h).trim() + '"><button class="hb" data-action="goto" data-h="' + x.h + '" aria-label="Hole ' + x.h + '">' + x.h + '</button></td>' : '<td>' + x.h + '</td>'), (hs, lab) => '<td>' + lab + '</td>');
+    if (tee) t += row('<tr><th scope="row">Yds</th>', (x) => '<td class="small">' + esc(tee.yards[x.h - 1]) + '</td>', (hs) => '<td class="tot small">' + sum(hs.map((x) => tee.yards[x.h - 1])) + '</td>');
+    t += row('<tr class="par"><th scope="row">Par</th>', (x) => '<td>' + x.par + '</td>', (hs) => '<td class="tot">' + sum(hs.map((x) => x.par)) + '</td>');
+    t += row('<tr><th scope="row">Hcp</th>', (x) => '<td class="small">' + x.hcp + '</td>', blank);
     for (const p of pp.list) {
-      const tot = sum(hs.map((x) => x.g[p.id]));
-      t += '<tr><th scope="row" class="c' + p.color + '">' + esc(short(p.name)) + '</th>' + hs.map((x) => '<td class="pc' + cur(x.h) + '">' + (x.g[p.id] == null ? '' : shape(x.g[p.id], x.par)) + (x.s[p.id] > 0 ? '<span class="dot"></span>' : '') + '</td>').join('') + '<td class="tot pc">' + (tot || '') + '</td></tr>';
+      t += row('<tr><th scope="row" class="c' + p.color + '">' + esc(short(p.name)) + '</th>', (x) => '<td class="pc' + cur(x.h) + '">' + (x.g[p.id] == null ? '' : shape(x.g[p.id], x.par)) + (x.s[p.id] > 0 ? '<span class="dot"></span>' : '') + '</td>', (hs) => '<td class="tot pc">' + (sum(hs.map((x) => x.g[p.id])) || '') + '</td>');
     }
-    t += '<tr><th scope="row">Won</th>' + hs.map((x) => {
+    t += row('<tr><th scope="row">Won</th>', (x) => {
       if (!x.done) return '<td></td>';
-      if (x.low.length === 1) { const p = pp.P[x.low[0]]; return '<td class="w t' + p.color + '">' + esc(p.ini) + '</td>'; }
+      if (x.low.length === 1) { const w = pp.P[x.low[0]]; return '<td class="w t' + w.color + '">' + esc(w.ini) + '</td>'; }
       return '<td class="w half">/</td>';
-    }).join('') + '<td class="tot"></td></tr>';
+    }, blank);
     if (r.games.skins.on) {
-      t += '<tr><th scope="row">Skins</th>' + hs.map((x) => {
+      t += row('<tr><th scope="row">Skins</th>', (x) => {
         const k = a.skins.per[x.h];
         if (!k || !k.winners.length) return '<td></td>';
         if (k.split) return '<td class="half">' + frac(k.val) + '</td>';
         return '<td class="w t' + pp.P[k.winners[0]].color + '">' + k.val + '</td>';
-      }).join('') + '<td class="tot"></td></tr>';
+      }, blank);
     }
     t += '</table></div>';
     return t;
@@ -2524,13 +2651,17 @@ if (typeof module !== 'undefined') module.exports = Golf;
     let out = '<section class="stack"><div class="label">Card</div>';
     const front = a.holes.filter((x) => x.h <= 9);
     const back = a.holes.filter((x) => x.h >= 10);
-    if (front.length) out += nineTable(r, a, pp, front, 'Out', tee, live);
-    if (back.length) out += nineTable(r, a, pp, back, 'In', tee, live);
+    // Wide: the whole round in one table, like a paper card opened flat. Phone: a table per nine.
+    if (front.length && back.length && isWide()) out += scoreTable(r, a, pp, [{ hs: front, lab: 'Out' }, { hs: back, lab: 'In' }], tee, live, true);
+    else {
+      if (front.length) out += scoreTable(r, a, pp, [{ hs: front, lab: 'Out' }], tee, live, false);
+      if (back.length) out += scoreTable(r, a, pp, [{ hs: back, lab: 'In' }], tee, live, false);
+    }
     const rows = pp.list.map((p) => {
       const gross = sum(a.holes.map((x) => x.g[p.id]));
       return '<tr><th scope="row" class="c' + p.color + '">' + esc(p.name) + '</th><td class="pc">' + (gross || '') + '</td><td>' + a.ch[p.id] + '</td><td class="pc">' + (a.complete ? gross - a.ch[p.id] : '') + '</td></tr>';
     }).join('');
-    out += '<div class="card" style="padding:4px 12px"><table class="tot-table"><thead><tr><th></th><th scope="col">Gross</th><th scope="col">Hcp</th><th scope="col">Net</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    out += '<div class="card tot-card" style="padding:4px 12px"><table class="tot-table"><thead><tr><th></th><th scope="col">Gross</th><th scope="col">Hcp</th><th scope="col">Net</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
     out += '<div class="legend"><span><i></i>Shot received</span>' + pp.list.map((p) => '<span><b class="c' + p.color + '">' + esc(p.ini) + '</b> ' + esc(p.name) + '</span>').join('') + '<span>/ tie for low</span></div>' + '<div class="legend"><span><span class="sm s-b key"></span>Birdie</span><span><span class="sm s-e key"></span>Eagle</span><span><span class="sm s-o key"></span>Bogey</span><span><span class="sm s-d key"></span>Double or worse</span></div>';
     out += '</section>';
     return out;
@@ -2550,6 +2681,7 @@ if (typeof module !== 'undefined') module.exports = Golf;
       }
     }
     if (g.junk.on) lines.push('Junk: ' + pp.list.map((p) => p.name + ' ' + a.junk.dots[p.id]).join(', '));
+    if (g.snake && g.snake.on) a.snake.segments.forEach((sg) => lines.push('Snake' + (sg.key === 'front' ? ' (front)' : sg.key === 'back' ? ' (back)' : '') + ': ' + (sg.count ? andList(sg.holders.map((id) => P[id].name)) + (sg.holders.length > 1 ? ' hold it' : ' holds it') + ', ' + money(snakeValue(r, sg.units)) : 'no 3-putts')));
     if (g.team.on) a.team.matches.forEach((m) => lines.push('Cart vs cart' + (a.team.partners === 'sixes' ? ' ' + m.first + '-' + m.last : '') + ', ' + sideName(m.A, P, false) + ' v ' + sideName(m.B, P, false) + ': ' + betStatus(m, m.bet, P, false)));
     const carried = g.team.on ? a.team.carried : g.nassau.on ? a.nassau.carried : null;
     const carriers = carried ? Object.keys(carried).filter((id) => carried[id] > 0 && P[id]).sort((p, q) => carried[q] - carried[p]) : [];
@@ -2583,10 +2715,17 @@ if (typeof module !== 'undefined') module.exports = Golf;
       const ids = Golf.pids(r);
       const scores = {}; const sandy = {};
       ids.forEach((p) => { scores[p] = { [k]: null }; sandy[p] = { [k]: null }; });
-      return { scores, junk: { greenie: { [k]: null }, sandy } };
+      return { scores, junk: { greenie: { [k]: null }, sandy }, snake: { [k]: [] } };
     });
   }
   function toggleGreenie(p) { scoreEdit((r, k) => { const c = (r.junk.greenie || {})[k] || null; return { junk: { greenie: { [k]: c === p ? null : p } } }; }); }
+  // A player's 3-putt on this hole, kept in the order tapped so "last one holds it" knows who putted last.
+  function toggleSnake(p) {
+    scoreEdit((r, k) => {
+      const cur = ((r.snake || {})[k] || []).filter((x) => x !== p);
+      return { snake: { [k]: cur.length === ((r.snake || {})[k] || []).length ? cur.concat(p) : cur } };
+    });
+  }
   function toggleSandy(p) { scoreEdit((r, k) => { const c = ((r.junk.sandy || {})[p] || {})[k] === true; return { junk: { sandy: { [p]: { [k]: c ? null : true } } } }; }); }
   async function deleteRound() {
     const id = S.roundId;
@@ -2629,9 +2768,40 @@ if (typeof module !== 'undefined') module.exports = Golf;
   function stakeField(path, v, unit) {
     return '<label class="money" for="' + idOf(path) + '"><span class="muted">$</span><input type="number" inputmode="decimal" min="0" step="0.5" id="' + idOf(path) + '" data-bind="' + path + '" value="' + esc(v ? v : '') + '" placeholder="0"><span class="muted">' + unit + '</span></label>';
   }
+  // How each game works, in plain words, under every game in setup and Settings.
+  const HOW_TO_PLAY = {
+    stroke: [
+      'Everyone plays their own ball. Your net score is your gross score minus your handicap strokes, and the lowest net total wins.',
+      'With a stake, everyone puts that amount in and the winner takes the pot. Ties split it.',
+    ],
+    skins: [
+      'Every hole is worth a skin. The lowest net score on the hole wins it outright, paid by each other player.',
+      'When the low score is tied: Split ties shares the skin between the tied players. Carryovers rolls it to the next hole, so that hole is worth more. Ties push means nobody wins it.',
+    ],
+    nassau: [
+      'Three bets in one: the front nine, the back nine and the full 18, each played as net match play (you win holes, not strokes).',
+      'With auto press, when a side falls 2 down in a bet, a new bet starts on the next hole and runs to the end of that nine. Each bet won is worth the stake.',
+      'With 3 or 4 players, every pair plays its own Nassau, or four can play 2 v 2 best ball.',
+    ],
+    team: [
+      'Two carts of two play net match play. Best ball counts each cart\u2019s better net score on a hole; Both balls count adds both partners\u2019 net scores.',
+      'Same carts keeps partners all day. Switch every 6 rotates partners after holes 6 and 12, so everyone rides with everyone, with a separate match for each six holes.',
+      'The card shows whose ball won each hole for the cart, for the trash talk.',
+    ],
+    junk: [
+      'Side points called dots. A birdie earns a dot (an eagle two). A greenie goes to whoever is on the green closest to the pin on a par 3, and a sandy is getting up and down from a bunker.',
+      'With par or better on, a greenie or sandy only counts if that player makes par or better. Each dot is paid by every other player.',
+    ],
+    snake: [
+      'Snake punishes 3-putts. The first player to 3-putt (or worse) takes the snake at the starting value. Every 3-putt after that doubles it and moves it to whoever just 3-putted.',
+      'Whoever holds the snake at the end pays its value, split among the other players.',
+      'If two players 3-putt the same hole, they share it. Or, with Last one holds it, you putt out in order and the last to 3-putt holds it alone. Reset at the turn plays a fresh snake on each nine.',
+    ],
+  };
   function gameBlock(prefix, key, name, desc, g, body) {
     const id = idOf(prefix + '.' + key + '.on');
-    return '<div class="game"><div class="game-head"><label for="' + id + '"><span class="gname">' + name + '</span><span class="gdesc">' + desc + '</span></label><input type="checkbox" class="switch" role="switch" id="' + id + '" data-bind="' + prefix + '.' + key + '.on" data-rerender="1"' + (g.on ? ' checked' : '') + '></div>' + (g.on ? body : '') + '</div>';
+    const how = HOW_TO_PLAY[key] ? '<details class="howto" data-howto="' + key + '"' + (S.howto[key] ? ' open' : '') + '><summary>How to play</summary>' + HOW_TO_PLAY[key].map((t) => '<p>' + esc(t) + '</p>').join('') + '</details>' : '';
+    return '<div class="game"><div class="game-head"><label for="' + id + '"><span class="gname">' + name + '</span><span class="gdesc">' + desc + '</span></label><input type="checkbox" class="switch" role="switch" id="' + id + '" data-bind="' + prefix + '.' + key + '.on" data-rerender="1"' + (g.on ? ' checked' : '') + '></div>' + how + (g.on ? body : '') + '</div>';
   }
   function teamOptions(ids) {
     const [a, b, c, d] = ids;
@@ -2680,6 +2850,10 @@ if (typeof module !== 'undefined') module.exports = Golf;
         return '<button type="button" class="opt" data-action="team" data-i="' + i + '" aria-pressed="' + (teamKey(t) === curKey) + '">' + esc(label) + '</button>';
       }).join('') + '</div></div>' + out;
     }
+    out += gameBlock(prefix, 'snake', 'Snake', '3-putts hold the snake, and every 3-putt doubles it. Whoever holds it at the end pays it' + (many ? ', split among the others.' : '.'), gm.snake,
+      (nine ? '' : '<div class="field"><span>How long a snake lasts</span>' + seg(prefix + '.snake.scope', [['round', 'All 18'], ['nine', 'Reset at the turn']], gm.snake.scope === 'nine' ? 'nine' : 'round') + '</div>') +
+      '<div class="field"><span>Two 3-putts on one hole</span>' + seg(prefix + '.snake.ties', [['split', 'They share it'], ['last', 'Last one holds it']], gm.snake.ties === 'last' ? 'last' : 'split') + '</div>' +
+      stakeField(prefix + '.snake.stake', gm.snake.stake, 'to start'));
     out += gameBlock(prefix, 'junk', 'Junk', 'A dot for each birdie, greenie and sandy' + (many ? ', paid by each other player.' : '.'), gm.junk,
       '<div class="chips">' + check(prefix + '.junk.birdies', 'Birdies', gm.junk.birdies !== false) + check(prefix + '.junk.greenies', 'Greenies', gm.junk.greenies !== false) + check(prefix + '.junk.sandies', 'Sandies', gm.junk.sandies !== false) + '</div>' + check(prefix + '.junk.parOrBetter', 'Greenies and sandies need par or better', gm.junk.parOrBetter !== false) + stakeField(prefix + '.junk.stake', gm.junk.stake, 'per dot'));
     return out;
@@ -2698,6 +2872,7 @@ if (typeof module !== 'undefined') module.exports = Golf;
       skins: { on: !!m.skins.on, mode: ['carry', 'push'].includes(m.skins.mode) ? m.skins.mode : 'split', stake: st(m.skins.stake), leftover: m.skins.leftover === 'lapse' ? 'lapse' : 'split' },
       nassau: { on: !!m.nassau.on, stake: st(m.nassau.stake), press: !!m.nassau.press, format: m.nassau.format === 'teams' ? 'teams' : 'pairs', teams: m.nassau.format === 'teams' ? teams : null },
       team: { on: !!m.team.on && (!ids || four), stake: st(m.team.stake), scoring: m.team.scoring === 'both' ? 'both' : 'best', partners: m.team.partners === 'sixes' ? 'sixes' : 'fixed', teams: m.team.on && four ? teams : null },
+      snake: { on: !!m.snake.on, stake: st(m.snake.stake), scope: m.snake.scope === 'nine' ? 'nine' : 'round', ties: m.snake.ties === 'last' ? 'last' : 'split' },
       junk: { on: !!m.junk.on, stake: st(m.junk.stake), birdies: m.junk.birdies !== false, greenies: m.junk.greenies !== false, sandies: m.junk.sandies !== false, parOrBetter: m.junk.parOrBetter !== false },
     };
   }
@@ -2802,6 +2977,8 @@ if (typeof module !== 'undefined') module.exports = Golf;
     let out = '<div class="row"><button class="btn ghost" data-action="cancel-setup">‹ ' + (d.id ? 'Back to round' : 'Back') + '</button></div>';
     out += '<div class="title">' + (d.id ? 'Round setup' : 'New round') + '</div>';
     if (S.formError) out += '<div class="err" role="alert">' + esc(S.formError) + '</div>';
+    const head = out;
+    out = '';
 
     out += '<section class="card form"><div class="row"><div class="label">Course</div>' + (S.course && S.courseReturn === 'setup' ? '' : '<input type="date" id="f-date" data-bind="setup.date" value="' + esc(d.date) + '" aria-label="Date" style="width:auto;min-height:36px;font-size:15px">') + '</div>';
     if (S.course && S.courseReturn === 'setup') out += courseEditorHTML();
@@ -2846,9 +3023,9 @@ if (typeof module !== 'undefined') module.exports = Golf;
     out += '<div class="field"><span>Shots for skins and matches</span>' + seg('setup.allowance', [['low', 'Off the low man'], ['full', 'Full handicaps']], d.allowance) + '<div class="muted" id="stroke-help">' + esc(strokeHelp(d)) + '</div></div>';
     out += '</section>';
 
-    out += '<section class="card form"><div class="label">Games</div>' + gamesEditor('setup.games', d.games, d.holes, Math.max(2, players.length), players) + '</section>';
-    out += '<button class="btn primary wide" data-action="save-setup">' + (d.id ? 'Save setup' : 'Start round') + '</button>';
-    return out;
+    const games = '<section class="card form"><div class="label">Games</div>' + gamesEditor('setup.games', d.games, d.holes, Math.max(2, players.length), players) + '</section>';
+    // Wide: the round on the left, its games on the right.
+    return head + twoCols(out, games, 'setup') + '<button class="btn primary wide" data-action="save-setup">' + (d.id ? 'Save setup' : 'Start round') + '</button>';
   }
   // Per player: index (or the old whole-number handicap), tees, and the course handicap they work out to.
   function playerHcpsHTML(d, players) {
@@ -3575,6 +3752,7 @@ if (typeof module !== 'undefined') module.exports = Golf;
     'clear-hole': () => clearHole(),
     greenie: (el) => toggleGreenie(el.dataset.v),
     sandy: (el) => toggleSandy(el.dataset.p),
+    snake: (el) => toggleSnake(el.dataset.p),
     'ask-delete': () => { S.confirm = 'round'; render(); },
     'edit-scores': () => {
       const r = roundData(S.roundId);
@@ -3644,6 +3822,17 @@ if (typeof module !== 'undefined') module.exports = Golf;
     'photo-stop': () => { if (S.photo && S.photo.ctl) S.photo.ctl.abort(); },
     'photo-retry': () => readCard(true),
   };
+  // Keep an opened "How to play" open when the setup page redraws after a tap. Toggle events don't bubble, so listen in the capture phase.
+  // Folding or unfolding a Duo, or resizing a window, across the one-or-two-column line redraws the page.
+  if (window.matchMedia) {
+    const wideMq = window.matchMedia(WIDE_QUERY);
+    if (wideMq.addEventListener) wideMq.addEventListener('change', refresh);
+    else if (wideMq.addListener) wideMq.addListener(refresh);
+  }
+  document.addEventListener('toggle', (e) => {
+    const key = e.target.dataset && e.target.dataset.howto;
+    if (key) S.howto = { ...S.howto, [key]: e.target.open };
+  }, true);
   // iOS only shows :active pressed styles when the page listens for touches.
   document.addEventListener('touchstart', () => {}, { passive: true });
   document.addEventListener('click', (e) => {
