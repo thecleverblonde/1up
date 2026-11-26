@@ -26,18 +26,27 @@ p, li { color: var(--ink-2); }
 <h2>Where your data lives</h2>
 <p>Everything you enter is saved on your own phone: in the app's files on iPhone, or in your browser for the web version. Deleting the app (or clearing the website's data) deletes it. You can export a copy from Settings at any time.</p>
 
+<h2>Your location</h2>
+<p>GPS yardages are optional. When they're on, 1up uses your phone's location while the app is open, for yardages, the hole map, and marking a green where you stand. That's worked out on your phone, and 1up doesn't send your position as you move around the course. Three things can still tell a map service something about where you are, and each is described below: marking a green where you stand, mapping a hole yourself, and when a hole's elevation is fetched. You can turn GPS off in 1up's Settings, or in your phone's settings.</p>
+<p><b>Marking a green where you stand.</b> If you mark a green from where you're standing, that spot is saved with the course on your phone, like a tee or green you tap on the map, and becomes part of the hole. From then on, the hole's aerial photo and elevation, which 1up asks the U.S. Geological Survey for (see Hole maps below), cover that spot. Each request is for a box. The photo's box is the area the hole map shows around the hole's tees and green, and the elevation's box is the hole's tees, green, outline and line from tee to green (which can bend at a dogleg), with a few dozen meters to spare. Each box is rounded out to a grid whose squares are 100 meters across on the flat map the requests use, about 70 to 100 meters on the ground depending on how far north the course is. The photo's size in pixels is set by its rounded box and your screen's size, and the elevation's by its rounded box alone, never by the spot you marked, so neither request shows the Geological Survey exactly where you marked. When marking a spot changes a box, the photo is asked for again right away, and the elevation once the green is within reach. 1up keeps no other record of where you've been.</p>
+<p><b>Mapping a hole yourself.</b> The map editor opens on what 1up already knows about the course: the previous hole's green, this hole's tee if the hole is already mapped, or the course's location. Only when the course has none of these does it open near you. Then 1up rounds your position to the nearest hundredth of a degree of latitude and longitude, about a kilometer (0.6 miles), and asks the U.S. Geological Survey for an aerial photo of the area around that rounded spot. Your exact position isn't sent.</p>
+
 <h2>What leaves your phone</h2>
 <ul>
-<li><b>Weather.</b> To show the weather for a round, 1up sends the course's town and the round's date and time to Open-Meteo (open-meteo.com), a free weather service.</li>
-<li><b>Map lookup.</b> To find that town on the map, the iPhone app asks Apple's map service and the web version asks Open-Meteo's place search. Only the town name is sent.</li>
+<li><b>Weather.</b> To show the weather for a round, 1up sends the map position of the course's town and the round's dates to Open-Meteo (open-meteo.com), a free weather service.</li>
+<li><b>Map lookup.</b> To find that town on the map, the iPhone app sends Apple's map service the course's Location as you entered it (like "Hartwell, GA"). The web version sends Open-Meteo's place search only the town, the part before the comma.</li>
+<li><b>Hole maps.</b> Aerial photos and ground elevation for a hole come from the U.S. Geological Survey (nationalmap.gov). 1up asks for the area around the hole's tee and green, not for where you are. The photo is fetched when you open the hole map. A hole's elevation is fetched the first time the green, or a spot you tap on the hole map, is within reach, then kept on your phone (it's fetched again if the hole's tee or green moves). Within reach is your longest club plus 30 yards, or 300 yards if your bag is empty, measured from where you are, or from the tee when you're far from the hole. When it's measured from where you are, the request's timing shows the Geological Survey that someone is near that green right then. With Tournament mode on, elevation is never fetched. A tee or green you marked where you stood, and the map editor's request near your rounded position, are described above. Hole outlines for some courses come from OpenStreetMap (openstreetmap.org) and are built into the app.</li>
 <li><b>Sharing.</b> When you tap Share, the text goes wherever you choose to send it, such as Messages.</li>
 </ul>
-<p>None of these requests include your name or any other personal information.</p>
+<p>No request ever includes your name or an account (1up has no accounts). As with any website, the services 1up reaches see your phone's internet (IP) address. Apart from what's described here, 1up sends them nothing about you.</p>
+
+<h2>The web version</h2>
+<p>The web version is a page hosted on GitHub Pages (github.io). Loading it works like visiting any website: GitHub sees your IP address and may log it for security, under GitHub's own privacy statement. Your rounds stay in your browser and are never sent to GitHub.</p>
 
 <h2>Questions</h2>
 <p>Testers can send questions or feedback through the TestFlight app.</p>
 
-<p><small>Last updated November 25, 2026.</small></p>
+<p><small>Last updated November 25, 2026 (your location, marking a green, when elevation is fetched, the map lookup, the map editor, IP addresses and the web version).</small></p>
 </main>
 </body>
 </html>
